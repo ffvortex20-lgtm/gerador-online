@@ -9,7 +9,6 @@
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
         import { getDatabase, ref, set, get, child } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js";
 
-        // Configuração extraída do seu google-services.json
         const firebaseConfig = {
             apiKey: "AIzaSyACGn5I--vTEmJ6eijN2lytZiMgo2ElnW4",
             authDomain: "vortexdev2.firebaseapp.com",
@@ -32,58 +31,61 @@
 
         async function gerarOuRecuperarKey() {
             const btn = document.getElementById('btnAction');
-            const keyDisplay = document.getElementById('keyDisplay');
             const msg = document.getElementById('statusMsg');
             
             btn.disabled = true;
             msg.innerText = "Validando dispositivo e IP...";
 
             const ip = await getIP();
-            // Fingerprint para simular ID único/IMEI
-            const deviceFingerprint = btoa(ip + navigator.userAgent).substring(0, 20).replace(/[/+=]/g, "");
+            // Gera um ID único baseado no navegador + IP para evitar múltiplas gerações no mesmo PC/Celular
+            const deviceFingerprint = btoa(ip + navigator.userAgent).substring(0, 15).replace(/[/+=]/g, "");
             
             const dbRef = ref(db);
             const agora = Date.now();
-            const vinteQuatroHoras = 24 * 60 * 60 * 1000;
+            const vinteQuatroHorasEmMs = 24 * 60 * 60 * 1000;
 
             try {
                 const snapshot = await get(child(dbRef, `KeysUsers/${deviceFingerprint}`));
                 
                 if (snapshot.exists()) {
                     const data = snapshot.val();
-                    const dataCriacao = parseInt(data.dias);
-                    const tempoRestante = (dataCriacao + vinteQuatroHoras) - agora;
+                    const dataCriacao = parseInt(data.dias); // Recupera o timestamp de quando a key foi criada
+                    const tempoPassado = agora - dataCriacao;
 
-                    if (tempoRestante > 0) {
+                    // Se ainda não passou 24 horas, devolve a mesma Key
+                    if (tempoPassado < vinteQuatroHorasEmMs) {
+                        const tempoRestante = vinteQuatroHorasEmMs - tempoPassado;
                         const horas = Math.floor(tempoRestante / (1000 * 60 * 60));
                         const mins = Math.floor((tempoRestante % (1000 * 60 * 60)) / (1000 * 60));
                         
                         exibirKey(data.key);
-                        msg.innerHTML = `LIMITE ATINGIDO!<br>Sua key atual ainda é válida. Nova geração em: <b>${horas}h ${mins}m</b>`;
+                        msg.innerHTML = `VOCÊ JÁ POSSUI UMA KEY ATIVA!<br>Expira em: <b>${horas}h ${mins}m</b>`;
                         btn.disabled = false;
                         return;
                     }
                 }
 
-                const novaKey = "vtx-dev-" + Math.floor(10000 + Math.random() * 90000);
+                // Se não existe ou a antiga expirou, gera uma nova de 1 dia (24h)
+                const novaKey = "vtx-free-" + Math.floor(10000 + Math.random() * 90000);
                 
                 const dadosUsuario = {
-                    device: navigator.userAgent + " | IP: " + ip,
-                    dias: agora.toString(),
+                    device: ip,
+                    dias: agora.toString(), // Salva o momento exato da criação
                     dispositivos: "1",
                     key: novaKey,
                     status: "ativada",
                     uid: deviceFingerprint,
-                    validade: "1"
+                    validade: "1" // Define como 1 dia
                 };
 
                 await set(ref(db, `KeysUsers/${deviceFingerprint}`), dadosUsuario);
                 
                 exibirKey(novaKey);
-                msg.innerText = "KEY GERADA E COPIADA!";
+                msg.innerHTML = "<span style='color: #00ff88'>NOVA KEY GERADA E COPIADA!</span>";
                 btn.disabled = false;
 
             } catch (e) {
+                console.error(e);
                 msg.innerText = "Erro ao conectar com o banco de dados.";
                 btn.disabled = false;
             }
@@ -173,9 +175,8 @@
 
         .main-btn:disabled { background: #222; color: #555; cursor: not-allowed; }
 
-        .status-msg { height: 40px; font-size: 0.85rem; color: #aaa; margin-bottom: 20px; }
+        .status-msg { height: 50px; font-size: 0.85rem; color: #aaa; margin-bottom: 20px; }
 
-        /* Estilização das Redes Sociais */
         .social-title {
             font-size: 0.7rem;
             color: #555;
@@ -224,13 +225,13 @@
 
     <button id="btnAction" class="main-btn" onclick="gerarOuRecuperarKey()">GERAR ACESSO 24H</button>
     
-    <div id="statusMsg" class="status-msg">Clique para gerar sua chave de acesso.</div>
+    <div id="statusMsg" class="status-msg">Clique para gerar sua chave de acesso gratuita.</div>
 
     <div class="social-title">Nossas Redes</div>
     <div class="links-grid">
         <a href="https://chat.whatsapp.com/DrlOTtZar6hIk7wRf9dMVn" target="_blank">🚀 GRUPO WHATSAPP</a>
         <a href="https://whatsapp.com/channel/0029VbC7FWcJENxsIOsndS15" target="_blank">📢 CANAL OFICIAL</a>
-        <a href="www.youtube.com/@Vortex-Ofc1" target="_blank">▶️ YOUTUBE</a>
+        <a href="https://www.youtube.com/@Vortex-Ofc1" target="_blank">▶️ YOUTUBE</a>
     </div>
 </div>
 
